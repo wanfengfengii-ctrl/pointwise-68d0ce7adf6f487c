@@ -1,0 +1,8 @@
+{
+  "plan": {"plan_id": "coat-two", "points": 2, "unit": "µm", "source": "head-A"},
+  "scans": [
+    {"scan_id": "S", "trigger": 31, "readings": [5, 17]},
+    {"scan_id": "T", "trigger": 32, "readings": [11, 9]},
+    {"scan_id": "U", "trigger": 33, "readings": [17, 16]}
+  ]
+}
