@@ -8,6 +8,7 @@ from archive.catalog import initialize_archive_store, open_archive_store
 from capture.recorder import record
 from capture.release import DevicePort
 from capture.storage import initialize_device_store, open_device_store
+from disposition.approvals import lookup_seal_basis
 from disposition.decision import lookup_release_basis
 from disposition.requests import submit
 from disposition.resume import retry
@@ -29,7 +30,11 @@ class LabCase(TestCase):
     def _connect(self, stack):
         device_db = stack.enter_context(closing(open_device_store(self.root / 'device.sqlite')))
         archive_db = stack.enter_context(closing(open_archive_store(self.root / 'archive.sqlite')))
-        port = DevicePort(device_db, partial(lookup_release_basis, archive_db))
+        port = DevicePort(
+            device_db,
+            partial(lookup_release_basis, archive_db),
+            partial(lookup_seal_basis, archive_db),
+        )
         return device_db, archive_db, port
 
     def reopen(self):

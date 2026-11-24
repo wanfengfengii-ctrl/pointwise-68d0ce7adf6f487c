@@ -17,5 +17,7 @@ def retry(
     hook: DispositionHook | None = None,
 ) -> Receipt:
     requested = validate_request(request_id, scan_id, operation)
+    if device.is_revisable(scan_id):
+        raise ValueError(f'{scan_id} is a revisable original and requires approval')
     request = require_matching_request(load_request(db, request_id), requested)
     return advance_disposition(db, device, request, hook=hook)

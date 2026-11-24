@@ -9,6 +9,7 @@ from archive.retrieve import retrieve
 from capture.recorder import record
 from capture.release import DevicePort, PortUnavailable
 from capture.storage import open_device_store
+from disposition.approvals import lookup_seal_basis
 from disposition.decision import lookup_release_basis
 from disposition.receipts import FileReceipt, PendingReceipt, WithdrawalReceipt
 from disposition.requests import submit
@@ -22,7 +23,11 @@ def open_lab(directory):
     with ExitStack() as connections:
         device_db = connections.enter_context(closing(open_device_store(directory / 'device.sqlite')))
         archive_db = connections.enter_context(closing(open_archive_store(directory / 'archive.sqlite')))
-        port = DevicePort(device_db, partial(lookup_release_basis, archive_db))
+        port = DevicePort(
+            device_db,
+            partial(lookup_release_basis, archive_db),
+            partial(lookup_seal_basis, archive_db),
+        )
         yield device_db, archive_db, port
 
 

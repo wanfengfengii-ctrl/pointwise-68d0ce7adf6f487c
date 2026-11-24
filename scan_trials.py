@@ -12,8 +12,8 @@ from capture.recorder import record
 from capture.release import PortUnavailable
 from capture.storage import open_device_store
 from demo import open_lab
-from disposition.journal import RequestParameterConflict
 from disposition.receipts import PendingReceipt
+from disposition.revision_journal import RequestParameterConflict as RevisionParameterConflict
 from disposition.requests import submit
 from disposition.resume import retry
 from intake.receive import stage
@@ -151,7 +151,7 @@ def rescan_wins(directory):
 
     with open_lab(directory) as (device_db, archive_db, port):
         check_receipt(approve(archive_db, port, "F", "S", old), "obsolete")
-        with expect_error(RequestParameterConflict):
+        with expect_error(RevisionParameterConflict):
             approve(archive_db, port, "F", "S", current)
         with expect_error(ValueError):
             stage_review(archive_db, "S", old, port.review)
@@ -211,21 +211,63 @@ def seal_wins(directory):
     return offline_result(directory, receipt.result_id, version, 31)
 
 
+def run_scenarios(directory, *, demo: bool):
+    for scenario in (rescan_wins, seal_wins):
+        case_dir = directory / scenario.__name__
+        case_dir.mkdir()
+        result = scenario(case_dir)
+        if demo:
+            print(json.dumps({"case": scenario.__name__, **result}, ensure_ascii=False))
+        else:
+            print(
+                f"核对完成：{scenario.__name__} 领到 {result['result_id']} "
+                f"v{result['version']} 触发 {result['trigger']} 极差 {result['spread']}"
+            )
+
+
+def run_verify() -> int:
+    """运行清单 verify 入口：原回归 + 普通件夹具 + 重扫两种先后与失败续办。"""
+    import unittest
+
+    suite = unittest.defaultTestLoader.discover("tests", top_level_dir=".")
+    result = unittest.TextTestRunner(verbosity=1).run(suite)
+    if not result.wasSuccessful():
+        return 1
+    with TemporaryDirectory() as root:
+        directory = Path(root)
+        check_fixture(directory)
+        run_scenarios(directory, demo=False)
+    print("核对完成：原回归与普通件夹具通过；重扫先成签触发 32，封定先成及续办签触发 31。")
+    return 0
+
+
+def run_demo() -> int:
+    """运行清单 demo 入口：原交班演示后追加亲自运行的重扫轨迹（断源领到触发 32）。"""
+    import demo as shift_demo
+
+    shift_demo.main()
+    with TemporaryDirectory() as root:
+        run_scenarios(Path(root), demo=True)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("check-fixture", "verify", "demo"))
+    parser.add_argument(
+        "mode",
+        choices=("check-fixture", "verify", "demo", "verify-all", "demo-all"),
+    )
     mode = parser.parse_args().mode
+    if mode == "verify-all":
+        raise SystemExit(run_verify())
+    if mode == "demo-all":
+        raise SystemExit(run_demo())
     with TemporaryDirectory() as root:
         directory = Path(root)
         if mode == "check-fixture":
             check_fixture(directory)
             return
-        for scenario in (rescan_wins, seal_wins):
-            case_dir = directory / scenario.__name__
-            case_dir.mkdir()
-            result = scenario(case_dir)
-            if mode == "demo":
-                print(json.dumps({"case": scenario.__name__, **result}, ensure_ascii=False))
+        run_scenarios(directory, demo=(mode == "demo"))
         if mode == "verify":
             print("核对完成：重扫先成签触发 32，封定先成及续办签触发 31。")
 
